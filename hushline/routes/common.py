@@ -126,7 +126,7 @@ def build_resend_email_body(
             return encrypted_email_body
 
         if has_encrypted_fields:
-            return EMAIL_GENERIC_BODY
+            return format_full_message_email_body(extracted_fields) or EMAIL_GENERIC_BODY
 
         email_body = format_full_message_email_body(extracted_fields)
         if email_body and user.pgp_key:
