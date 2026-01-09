@@ -13,10 +13,9 @@ from flask import (
 from werkzeug.wrappers.response import Response
 
 from hushline.auth import authentication_required
-from hushline.crypto import encrypt_message
 from hushline.db import db
 from hushline.forms import DeleteMessageForm, ResendMessageForm, UpdateMessageStatusForm
-from hushline.routes.common import do_send_email
+from hushline.routes.common import build_notification_email_body, do_send_email
 from hushline.model import (
     FieldValue,
     Message,
@@ -26,34 +25,6 @@ from hushline.model import (
 
 
 def register_message_routes(app: Flask) -> None:
-    def build_resend_email_body(user: User, message: Message) -> str:
-        plaintext_body = "You have a new Hush Line message! Please log in to read it."
-        if not user.email_include_message_content:
-            return plaintext_body
-
-        email_body = ""
-        for field_value in message.field_values:
-            email_body += (
-                f"\n\n{field_value.field_definition.label}\n\n{field_value.value}\n\n=============="
-            )
-        email_body = email_body.strip() or plaintext_body
-
-        if user.email_encrypt_entire_body:
-            if not user.pgp_key:
-                current_app.logger.debug(
-                    "Email body encryption enabled but user has no PGP key; using generic body"
-                )
-                return plaintext_body
-            encrypted_body = encrypt_message(email_body, user.pgp_key)
-            if encrypted_body:
-                return encrypted_body
-            current_app.logger.debug(
-                "Email body encryption failed; using generic body for resend"
-            )
-            return plaintext_body
-
-        return email_body
-
     @app.route("/message/<public_id>")
     @authentication_required
     def message(public_id: str) -> str:
@@ -169,7 +140,11 @@ def register_message_routes(app: Flask) -> None:
             flash("⛔️ Email notifications are disabled or no email is configured.")
             return redirect(url_for("message", public_id=public_id))
 
-        email_body = build_resend_email_body(user, message)
+        extracted_fields = [
+            (field_value.field_definition.label, field_value.value)
+            for field_value in message.field_values
+        ]
+        email_body = build_notification_email_body(user, extracted_fields, None)
         do_send_email(user, email_body)
         flash("📧 Message resent to email.")
         return redirect(url_for("message", public_id=public_id))
