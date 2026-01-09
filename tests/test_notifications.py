@@ -229,9 +229,65 @@ def test_notifications_enabled_yes_content_yes_encrypted_body_failed_client_encr
     assert response.status_code == 200
     assert pgp_message_sig in response.text, response.text
 
-    # Check if do_send_email was called with plaintext message
+
+@pytest.mark.usefixtures("_authenticated_user")
+@patch("hushline.routes.message.do_send_email")
+def test_resend_message_email_without_content(
+    mock_do_send_email: MagicMock, client: FlaskClient, user: User, message: Message
+) -> None:
+    user.enable_email_notifications = True
+    user.email_include_message_content = False
+    user.email_encrypt_entire_body = False
+    user.email = "test@example.com"
+    db.session.commit()
+
+    response = client.post(
+        url_for("resend_message", public_id=message.public_id),
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Message resent to email." in response.text
     mock_do_send_email.assert_called_once_with(user, plaintext_new_message_body)
 
-    response = client.get(url_for("message", public_id=message.public_id), follow_redirects=True)
+
+@pytest.mark.usefixtures("_authenticated_user")
+@patch("hushline.routes.message.do_send_email")
+def test_resend_message_email_with_content(
+    mock_do_send_email: MagicMock, client: FlaskClient, user: User, message: Message
+) -> None:
+    user.enable_email_notifications = True
+    user.email_include_message_content = True
+    user.email_encrypt_entire_body = False
+    user.email = "test@example.com"
+    db.session.commit()
+
+    response = client.post(
+        url_for("resend_message", public_id=message.public_id),
+        follow_redirects=True,
+    )
     assert response.status_code == 200
-    assert pgp_message_sig in response.text, response.text
+    assert "Message resent to email." in response.text
+    mock_do_send_email.assert_called_once()
+    args, _ = mock_do_send_email.call_args
+    assert message.field_values[0].field_definition.label in args[1]
+    assert message.field_values[0].value in args[1]
+
+
+@pytest.mark.usefixtures("_authenticated_user")
+def test_resend_message_button_visibility(
+    client: FlaskClient, user: User, message: Message
+) -> None:
+    user.enable_email_notifications = True
+    user.email = "test@example.com"
+    db.session.commit()
+
+    response = client.get(url_for("message", public_id=message.public_id))
+    assert response.status_code == 200
+    assert "Resend to Email" in response.text
+
+    user.enable_email_notifications = False
+    db.session.commit()
+
+    response = client.get(url_for("message", public_id=message.public_id))
+    assert response.status_code == 200
+    assert "Resend to Email" not in response.text
