@@ -15,7 +15,11 @@ from werkzeug.wrappers.response import Response
 from hushline.auth import authentication_required
 from hushline.db import db
 from hushline.forms import DeleteMessageForm, ResendMessageForm, UpdateMessageStatusForm
-from hushline.routes.common import build_notification_email_body, do_send_email
+from hushline.routes.common import (
+    build_notification_email_body,
+    do_send_email,
+    messages_support_encrypted_email_body,
+)
 from hushline.model import (
     FieldValue,
     Message,
@@ -144,9 +148,10 @@ def register_message_routes(app: Flask) -> None:
             (field_value.field_definition.label, field_value.value)
             for field_value in message.field_values
         ]
-        email_body = build_notification_email_body(
-            user, extracted_fields, message.encrypted_email_body
-        )
+        encrypted_email_body = None
+        if messages_support_encrypted_email_body():
+            encrypted_email_body = message.encrypted_email_body
+        email_body = build_notification_email_body(user, extracted_fields, encrypted_email_body)
         do_send_email(user, email_body)
         flash("📧 Message resent to email.")
         return redirect(url_for("message", public_id=public_id))

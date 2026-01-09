@@ -21,7 +21,12 @@ from hushline.model import (
     OrganizationSetting,
     Username,
 )
-from hushline.routes.common import build_notification_email_body, do_send_email, validate_captcha
+from hushline.routes.common import (
+    build_notification_email_body,
+    do_send_email,
+    messages_support_encrypted_email_body,
+    validate_captcha,
+)
 from hushline.routes.forms import DynamicMessageForm
 from hushline.safe_template import safe_render_template
 
@@ -116,7 +121,11 @@ def register_profile_routes(app: Flask) -> None:
                 extracted_fields.append((field_definition.label, field_value.value))
 
             encrypted_email_body = form.encrypted_email_body.data
-            if encrypted_email_body and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
+            if (
+                encrypted_email_body
+                and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----")
+                and messages_support_encrypted_email_body()
+            ):
                 message.encrypted_email_body = encrypted_email_body
 
             db.session.commit()

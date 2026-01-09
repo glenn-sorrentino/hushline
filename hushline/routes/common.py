@@ -8,6 +8,7 @@ from flask import (
     flash,
     session,
 )
+from sqlalchemy import inspect
 from unidecode import unidecode
 from wtforms import Field, Form
 from wtforms.validators import ValidationError
@@ -116,3 +117,12 @@ def build_notification_email_body(
         email_body += f"\n\n{name}\n\n{value}\n\n=============="
     current_app.logger.debug("Sending email with unencrypted body")
     return email_body.strip() or plaintext_body
+
+
+def messages_support_encrypted_email_body() -> bool:
+    try:
+        columns = inspect(db.engine).get_columns("messages")
+    except Exception:
+        current_app.logger.exception("Failed to inspect messages table columns")
+        return False
+    return any(column["name"] == "encrypted_email_body" for column in columns)
