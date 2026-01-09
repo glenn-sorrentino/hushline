@@ -12,6 +12,7 @@ from unidecode import unidecode
 from wtforms import Field, Form
 from wtforms.validators import ValidationError
 
+from hushline.crypto import encrypt_message
 from hushline.db import db
 from hushline.email import create_smtp_config, send_email
 from hushline.model import SMTPEncryption, User, Username
@@ -96,7 +97,10 @@ def do_send_email(user: User, body: str) -> None:
 
 
 def build_notification_email_body(
-    user: User, extracted_fields: list[tuple[str, str]], encrypted_email_body: str | None
+    user: User,
+    extracted_fields: list[tuple[str, str]],
+    encrypted_email_body: str | None,
+    encrypt_fallback: bool = False,
 ) -> str:
     plaintext_body = "You have a new Hush Line message! Please log in to read it."
     if not user.email_include_message_content:
@@ -106,6 +110,17 @@ def build_notification_email_body(
         if encrypted_email_body and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
             current_app.logger.debug("Sending email with encrypted body")
             return encrypted_email_body
+        if encrypt_fallback and user.pgp_key:
+            email_body = ""
+            for name, value in extracted_fields:
+                email_body += f"\n\n{name}\n\n{value}\n\n=============="
+            email_body = email_body.strip() or plaintext_body
+            encrypted_body = encrypt_message(email_body, user.pgp_key)
+            if encrypted_body:
+                current_app.logger.debug("Sending email with encrypted body")
+                return encrypted_body
+            current_app.logger.debug("Email body encryption failed, sending generic body")
+            return plaintext_body
         current_app.logger.debug("Email body is not encrypted, sending email with generic body")
         return plaintext_body
 

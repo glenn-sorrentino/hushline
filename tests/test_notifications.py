@@ -247,7 +247,9 @@ def test_resend_message_email_without_content(
     )
     assert response.status_code == 200
     assert "Message resent to email." in response.text
-    mock_do_send_email.assert_called_once_with(user, plaintext_new_message_body)
+    mock_do_send_email.assert_called_once()
+    args, _ = mock_do_send_email.call_args
+    assert args[1].startswith("-----BEGIN PGP MESSAGE-----")
 
 
 @pytest.mark.usefixtures("_authenticated_user")
@@ -291,7 +293,9 @@ def test_resend_message_email_with_content_when_encryption_enabled(
     )
     assert response.status_code == 200
     assert "Message resent to email." in response.text
-    mock_do_send_email.assert_called_once_with(user, plaintext_new_message_body)
+    mock_do_send_email.assert_called_once()
+    args, _ = mock_do_send_email.call_args
+    assert args[1].startswith("-----BEGIN PGP MESSAGE-----")
 
 
 @pytest.mark.usefixtures("_authenticated_user")

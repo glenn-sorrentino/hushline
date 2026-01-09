@@ -144,7 +144,9 @@ def register_message_routes(app: Flask) -> None:
             (field_value.field_definition.label, field_value.value)
             for field_value in message.field_values
         ]
-        email_body = build_notification_email_body(user, extracted_fields, None)
+        email_body = build_notification_email_body(
+            user, extracted_fields, None, encrypt_fallback=True
+        )
         do_send_email(user, email_body)
         flash("📧 Message resent to email.")
         return redirect(url_for("message", public_id=public_id))
