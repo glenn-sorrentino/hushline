@@ -274,6 +274,7 @@ def test_resend_message_email_with_content(
 
 
 @pytest.mark.usefixtures("_authenticated_user")
+@pytest.mark.usefixtures("_pgp_user")
 @patch("hushline.routes.message.do_send_email")
 def test_resend_message_email_with_content_when_encryption_enabled(
     mock_do_send_email: MagicMock, client: FlaskClient, user: User, message: Message
@@ -292,8 +293,7 @@ def test_resend_message_email_with_content_when_encryption_enabled(
     assert "Message resent to email." in response.text
     mock_do_send_email.assert_called_once()
     args, _ = mock_do_send_email.call_args
-    assert message.field_values[0].field_definition.label in args[1]
-    assert message.field_values[0].value in args[1]
+    assert args[1].startswith("-----BEGIN PGP MESSAGE-----")
 
 
 @pytest.mark.usefixtures("_authenticated_user")

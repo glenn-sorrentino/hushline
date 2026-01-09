@@ -13,6 +13,7 @@ from flask import (
 from werkzeug.wrappers.response import Response
 
 from hushline.auth import authentication_required
+from hushline.crypto import encrypt_message
 from hushline.db import db
 from hushline.forms import DeleteMessageForm, ResendMessageForm, UpdateMessageStatusForm
 from hushline.routes.common import do_send_email
@@ -30,16 +31,28 @@ def register_message_routes(app: Flask) -> None:
         if not user.email_include_message_content:
             return plaintext_body
 
-        if user.email_encrypt_entire_body:
-            current_app.logger.debug(
-                "Email body encryption enabled; resending message with unencrypted contents"
-            )
         email_body = ""
         for field_value in message.field_values:
             email_body += (
                 f"\n\n{field_value.field_definition.label}\n\n{field_value.value}\n\n=============="
             )
-        return email_body.strip() or plaintext_body
+        email_body = email_body.strip() or plaintext_body
+
+        if user.email_encrypt_entire_body:
+            if not user.pgp_key:
+                current_app.logger.debug(
+                    "Email body encryption enabled but user has no PGP key; using generic body"
+                )
+                return plaintext_body
+            encrypted_body = encrypt_message(email_body, user.pgp_key)
+            if encrypted_body:
+                return encrypted_body
+            current_app.logger.debug(
+                "Email body encryption failed; using generic body for resend"
+            )
+            return plaintext_body
+
+        return email_body
 
     @app.route("/message/<public_id>")
     @authentication_required
