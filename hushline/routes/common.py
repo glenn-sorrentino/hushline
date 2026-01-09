@@ -116,6 +116,7 @@ def build_resend_email_body(
     user: User,
     extracted_fields: Sequence[tuple[str, str]],
     encrypted_email_body: str | None,
+    has_encrypted_fields: bool,
 ) -> str:
     if not user.email_include_message_content:
         return EMAIL_GENERIC_BODY
@@ -123,6 +124,9 @@ def build_resend_email_body(
     if user.email_encrypt_entire_body:
         if encrypted_email_body and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
             return encrypted_email_body
+
+        if has_encrypted_fields:
+            return EMAIL_GENERIC_BODY
 
         email_body = format_full_message_email_body(extracted_fields)
         if email_body and user.pgp_key:
