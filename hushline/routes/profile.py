@@ -115,6 +115,10 @@ def register_profile_routes(app: Flask) -> None:
                 db.session.flush()
                 extracted_fields.append((field_definition.label, field_value.value))
 
+            encrypted_email_body = form.encrypted_email_body.data
+            if encrypted_email_body and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
+                message.encrypted_email_body = encrypted_email_body
+
             db.session.commit()
 
             if uname.user.enable_email_notifications:

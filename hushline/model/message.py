@@ -43,6 +43,7 @@ class Message(Model):
     status_changed_at: Mapped[datetime] = mapped_column(
         db.DateTime(timezone=True), server_default=text("NOW()"), nullable=False
     )
+    encrypted_email_body: Mapped[str | None] = mapped_column(db.Text, nullable=True)
     field_values: Mapped[list["FieldValue"]] = relationship(
         "FieldValue", back_populates="message", cascade="all, delete-orphan"
     )

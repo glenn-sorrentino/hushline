@@ -13,6 +13,9 @@ msg_content = "This is a test message."
 
 pgp_message_sig = "-----BEGIN PGP MESSAGE-----\n\n"
 plaintext_new_message_body = "You have a new Hush Line message! Please log in to read it."
+encrypted_email_body = (
+    "-----BEGIN PGP MESSAGE-----\n\nfake encrypted body\n\n-----END PGP MESSAGE-----"
+)
 
 
 @pytest.mark.usefixtures("_authenticated_user")
@@ -50,6 +53,9 @@ def test_notifications_disabled(
     response = client.get(url_for("message", public_id=message.public_id), follow_redirects=True)
     assert response.status_code == 200
     assert pgp_message_sig in response.text, response.text
+
+    # Check if do_send_email was called with plaintext message
+    mock_do_send_email.assert_called_once_with(user, plaintext_new_message_body)
 
 
 @pytest.mark.usefixtures("_authenticated_user")
@@ -155,10 +161,6 @@ def test_notifications_enabled_yes_content_yes_encrypted_body(
     user.email_encrypt_entire_body = True
     db.session.commit()
 
-    encrypted_email_body = (
-        "-----BEGIN PGP MESSAGE-----\n\nfake encrypted body\n\n-----END PGP MESSAGE-----"
-    )
-
     response = client.post(
         url_for("profile", username=user.primary_username.username),
         data={
@@ -229,6 +231,9 @@ def test_notifications_enabled_yes_content_yes_encrypted_body_failed_client_encr
     assert response.status_code == 200
     assert pgp_message_sig in response.text, response.text
 
+    # Check if do_send_email was called with plaintext message
+    mock_do_send_email.assert_called_once_with(user, plaintext_new_message_body)
+
 
 @pytest.mark.usefixtures("_authenticated_user")
 @patch("hushline.routes.message.do_send_email")
@@ -247,9 +252,7 @@ def test_resend_message_email_without_content(
     )
     assert response.status_code == 200
     assert "Message resent to email." in response.text
-    mock_do_send_email.assert_called_once()
-    args, _ = mock_do_send_email.call_args
-    assert args[1].startswith("-----BEGIN PGP MESSAGE-----")
+    mock_do_send_email.assert_called_once_with(user, plaintext_new_message_body)
 
 
 @pytest.mark.usefixtures("_authenticated_user")
@@ -285,6 +288,7 @@ def test_resend_message_email_with_content_when_encryption_enabled(
     user.email_include_message_content = True
     user.email_encrypt_entire_body = True
     user.email = "test@example.com"
+    message.encrypted_email_body = encrypted_email_body
     db.session.commit()
 
     response = client.post(
@@ -293,9 +297,7 @@ def test_resend_message_email_with_content_when_encryption_enabled(
     )
     assert response.status_code == 200
     assert "Message resent to email." in response.text
-    mock_do_send_email.assert_called_once()
-    args, _ = mock_do_send_email.call_args
-    assert args[1].startswith("-----BEGIN PGP MESSAGE-----")
+    mock_do_send_email.assert_called_once_with(user, encrypted_email_body)
 
 
 @pytest.mark.usefixtures("_authenticated_user")
