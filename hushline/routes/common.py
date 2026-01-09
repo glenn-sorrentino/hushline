@@ -12,7 +12,6 @@ from unidecode import unidecode
 from wtforms import Field, Form
 from wtforms.validators import ValidationError
 
-from hushline.crypto import encrypt_message
 from hushline.db import db
 from hushline.email import create_smtp_config, send_email
 from hushline.model import SMTPEncryption, User, Username
@@ -116,7 +115,6 @@ def build_resend_email_body(
     user: User,
     extracted_fields: Sequence[tuple[str, str]],
     encrypted_email_body: str | None,
-    has_encrypted_fields: bool,
 ) -> str:
     if not user.email_include_message_content:
         return EMAIL_GENERIC_BODY
@@ -124,15 +122,6 @@ def build_resend_email_body(
     if user.email_encrypt_entire_body:
         if encrypted_email_body and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
             return encrypted_email_body
-
-        if has_encrypted_fields:
-            return format_full_message_email_body(extracted_fields) or EMAIL_GENERIC_BODY
-
-        email_body = format_full_message_email_body(extracted_fields)
-        if email_body and user.pgp_key:
-            encrypted_body = encrypt_message(email_body, user.pgp_key)
-            if encrypted_body:
-                return encrypted_body
         return EMAIL_GENERIC_BODY
 
     formatted_body = format_message_email_fields(extracted_fields)

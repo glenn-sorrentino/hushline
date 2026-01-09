@@ -151,13 +151,7 @@ def register_message_routes(app: Flask) -> None:
             (field_value.field_definition.label, field_value.value or "")
             for field_value in message.field_values
         ]
-        has_encrypted_fields = any(field_value.encrypted for field_value in message.field_values)
-        email_body = build_resend_email_body(
-            user,
-            extracted_fields,
-            None,
-            has_encrypted_fields,
-        )
+        email_body = build_resend_email_body(user, extracted_fields, None)
         do_send_email(user, email_body.strip())
         flash("📧 Message resent to your email.")
         return redirect(url_for("message", public_id=public_id))
