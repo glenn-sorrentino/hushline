@@ -122,7 +122,8 @@ def build_resend_email_body(
     if user.email_encrypt_entire_body:
         if encrypted_email_body and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
             return encrypted_email_body
-        return EMAIL_GENERIC_BODY
+        formatted_body = format_full_message_email_body(extracted_fields)
+        return formatted_body or EMAIL_GENERIC_BODY
 
     formatted_body = format_message_email_fields(extracted_fields)
     return formatted_body or EMAIL_GENERIC_BODY
