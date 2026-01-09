@@ -21,7 +21,12 @@ from hushline.model import (
     OrganizationSetting,
     Username,
 )
-from hushline.routes.common import do_send_email, validate_captcha
+from hushline.routes.common import (
+    EMAIL_GENERIC_BODY,
+    do_send_email,
+    format_message_email_fields,
+    validate_captcha,
+)
 from hushline.routes.forms import DynamicMessageForm
 from hushline.safe_template import safe_render_template
 
@@ -115,17 +120,19 @@ def register_profile_routes(app: Flask) -> None:
                 db.session.flush()
                 extracted_fields.append((field_definition.label, field_value.value))
 
+            encrypted_email_body = form.encrypted_email_body.data or ""
+            if encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
+                message.encrypted_email_body = encrypted_email_body
+
             db.session.commit()
 
-            plaintext_new_message_body = (
-                "You have a new Hush Line message! Please log in to read it."
-            )
+            plaintext_new_message_body = EMAIL_GENERIC_BODY
             if uname.user.enable_email_notifications:
                 if uname.user.email_include_message_content:
                     # Only encrypt the entire body if we got the encrypted body from the form
                     if uname.user.email_encrypt_entire_body:
-                        if form.encrypted_email_body.data.startswith("-----BEGIN PGP MESSAGE-----"):
-                            email_body = form.encrypted_email_body.data
+                        if encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
+                            email_body = encrypted_email_body
                             current_app.logger.debug("Sending email with encrypted body")
                         else:
                             # If the body is not encrypted, we should not send it
@@ -136,15 +143,13 @@ def register_profile_routes(app: Flask) -> None:
                     else:
                         # If we don't want to encrypt the entire body, or if client-side encryption
                         # of the body failed
-                        email_body = ""
-                        for name, value in extracted_fields:
-                            email_body += f"\n\n{name}\n\n{value}\n\n=============="
+                        email_body = format_message_email_fields(extracted_fields)
                         current_app.logger.debug("Sending email with unencrypted body")
                 else:
                     email_body = plaintext_new_message_body
                     current_app.logger.debug("Sending email with generic body")
 
-                do_send_email(uname.user, email_body.strip())
+                do_send_email(uname.user, (email_body or plaintext_new_message_body).strip())
 
             flash("👍 Message submitted successfully.")
             session["reply_slug"] = message.reply_slug

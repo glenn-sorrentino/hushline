@@ -12,9 +12,12 @@ from unidecode import unidecode
 from wtforms import Field, Form
 from wtforms.validators import ValidationError
 
+from hushline.crypto import encrypt_message
 from hushline.db import db
 from hushline.email import create_smtp_config, send_email
 from hushline.model import SMTPEncryption, User, Username
+
+EMAIL_GENERIC_BODY = "You have a new Hush Line message! Please log in to read it."
 
 
 def valid_username(form: Form, field: Field) -> None:
@@ -93,3 +96,40 @@ def do_send_email(user: User, body: str) -> None:
         send_email(user.email, "New Hush Line Message Received", body, smtp_config)
     except Exception as e:
         current_app.logger.error(f"Error sending email: {str(e)}", exc_info=True)
+
+
+def format_message_email_fields(extracted_fields: Sequence[tuple[str, str]]) -> str:
+    email_body = ""
+    for name, value in extracted_fields:
+        email_body += f"\n\n{name}\n\n{value}\n\n=============="
+    return email_body.strip()
+
+
+def format_full_message_email_body(extracted_fields: Sequence[tuple[str, str]]) -> str:
+    email_body = ""
+    for name, value in extracted_fields:
+        email_body += f"# {name}\n\n{value}\n\n====================\n\n"
+    return email_body.strip()
+
+
+def build_resend_email_body(
+    user: User,
+    extracted_fields: Sequence[tuple[str, str]],
+    encrypted_email_body: str | None,
+) -> str:
+    if not user.email_include_message_content:
+        return EMAIL_GENERIC_BODY
+
+    if user.email_encrypt_entire_body:
+        if encrypted_email_body and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
+            return encrypted_email_body
+
+        email_body = format_full_message_email_body(extracted_fields)
+        if email_body and user.pgp_key:
+            encrypted_body = encrypt_message(email_body, user.pgp_key)
+            if encrypted_body:
+                return encrypted_body
+        return EMAIL_GENERIC_BODY
+
+    formatted_body = format_message_email_fields(extracted_fields)
+    return formatted_body or EMAIL_GENERIC_BODY

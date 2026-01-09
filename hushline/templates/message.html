@@ -10,6 +10,12 @@
       {{ update_status_form.hidden_tag() }}
       {{ update_status_form.status }}
     </form>
+    {% if message.username.user.enable_email_notifications %}
+      <form class="formBody" method="POST" action="{{ url_for('resend_message_email', public_id=message.public_id) }}">
+        {{ resend_message_form.hidden_tag() }}
+        {{ resend_message_form.submit(class="btn-primary") }}
+      </form>
+    {% endif %}
     <form class="formBody" method="POST" action="{{ url_for('delete_message', public_id=message.public_id) }}">
       {{ delete_message_form.submit(class="btn-danger") }}
     </form>
