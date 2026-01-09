@@ -32,10 +32,8 @@ def register_message_routes(app: Flask) -> None:
 
         if user.email_encrypt_entire_body:
             current_app.logger.debug(
-                "Email body encryption enabled; resending message with generic body"
+                "Email body encryption enabled; resending message with unencrypted contents"
             )
-            return plaintext_body
-
         email_body = ""
         for field_value in message.field_values:
             email_body += (

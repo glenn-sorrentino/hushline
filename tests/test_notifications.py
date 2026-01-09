@@ -274,6 +274,29 @@ def test_resend_message_email_with_content(
 
 
 @pytest.mark.usefixtures("_authenticated_user")
+@patch("hushline.routes.message.do_send_email")
+def test_resend_message_email_with_content_when_encryption_enabled(
+    mock_do_send_email: MagicMock, client: FlaskClient, user: User, message: Message
+) -> None:
+    user.enable_email_notifications = True
+    user.email_include_message_content = True
+    user.email_encrypt_entire_body = True
+    user.email = "test@example.com"
+    db.session.commit()
+
+    response = client.post(
+        url_for("resend_message", public_id=message.public_id),
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    assert "Message resent to email." in response.text
+    mock_do_send_email.assert_called_once()
+    args, _ = mock_do_send_email.call_args
+    assert message.field_values[0].field_definition.label in args[1]
+    assert message.field_values[0].value in args[1]
+
+
+@pytest.mark.usefixtures("_authenticated_user")
 def test_resend_message_button_visibility(
     client: FlaskClient, user: User, message: Message
 ) -> None:
