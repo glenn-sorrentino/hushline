@@ -104,12 +104,12 @@ def compose_message_email_body(
 ) -> str:
     if user.email_include_message_content:
         if user.email_encrypt_entire_body:
-            if encrypted_email_body and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
+            if encrypted_email_body and encrypted_email_body.startswith(
+                "-----BEGIN PGP MESSAGE-----"
+            ):
                 current_app.logger.debug("Sending email with encrypted body")
                 return encrypted_email_body
-            current_app.logger.debug(
-                "Email body is not encrypted, sending email with generic body"
-            )
+            current_app.logger.debug("Email body is not encrypted, sending email with generic body")
             return PLAINTEXT_NEW_MESSAGE_BODY
 
         email_body = ""
