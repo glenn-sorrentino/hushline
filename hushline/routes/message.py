@@ -14,13 +14,14 @@ from werkzeug.wrappers.response import Response
 
 from hushline.auth import authentication_required
 from hushline.db import db
-from hushline.forms import DeleteMessageForm, UpdateMessageStatusForm
+from hushline.forms import DeleteMessageForm, ResendMessageForm, UpdateMessageStatusForm
 from hushline.model import (
     FieldValue,
     Message,
     User,
     Username,
 )
+from hushline.routes.common import compose_message_email_body, do_send_email
 
 
 def register_message_routes(app: Flask) -> None:
@@ -38,12 +39,14 @@ def register_message_routes(app: Flask) -> None:
 
         update_status_form = UpdateMessageStatusForm(data={"status": msg.status.value})
         delete_message_form = DeleteMessageForm()
+        resend_message_form = ResendMessageForm()
 
         return render_template(
             "message.html",
             message=msg,
             update_status_form=update_status_form,
             delete_message_form=delete_message_form,
+            resend_message_form=resend_message_form,
         )
 
     @app.route("/reply/<slug>")
@@ -113,4 +116,32 @@ def register_message_routes(app: Flask) -> None:
                     f"Message.public_id={public_id} User.id={user.id}"
                 )
                 flash("Internal server error. Message not updated.")
+        return redirect(url_for("message", public_id=public_id))
+
+    @app.route("/message/<public_id>/resend", methods=["POST"])
+    @authentication_required
+    def resend_message(public_id: str) -> Response:
+        resend_form = ResendMessageForm()
+        if not resend_form.validate_on_submit():
+            flash("⛔️ Invalid resend request.")
+            return redirect(url_for("message", public_id=public_id))
+
+        user = db.session.scalars(db.select(User).filter_by(id=session["user_id"])).one()
+
+        message = db.session.scalars(
+            db.select(Message)
+            .join(Username)
+            .filter(Username.user_id == user.id, Message.public_id == public_id)
+        ).one_or_none()
+        if not message:
+            flash("⛔️ Message not found.")
+            return redirect(url_for("inbox"))
+
+        extracted_fields = [
+            (field_value.field_definition.label, field_value.value)
+            for field_value in message.field_values
+        ]
+        email_body = compose_message_email_body(user, extracted_fields)
+        do_send_email(user, email_body.strip())
+        flash("✉️ Email resent successfully.")
         return redirect(url_for("message", public_id=public_id))

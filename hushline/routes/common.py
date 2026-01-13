@@ -1,7 +1,7 @@
 import re
 import socket
 import unicodedata
-from typing import Sequence
+from typing import Iterable, Sequence
 
 from flask import (
     current_app,
@@ -15,6 +15,8 @@ from wtforms.validators import ValidationError
 from hushline.db import db
 from hushline.email import create_smtp_config, send_email
 from hushline.model import SMTPEncryption, User, Username
+
+PLAINTEXT_NEW_MESSAGE_BODY = "You have a new Hush Line message! Please log in to read it."
 
 
 def valid_username(form: Form, field: Field) -> None:
@@ -93,3 +95,28 @@ def do_send_email(user: User, body: str) -> None:
         send_email(user.email, "New Hush Line Message Received", body, smtp_config)
     except Exception as e:
         current_app.logger.error(f"Error sending email: {str(e)}", exc_info=True)
+
+
+def compose_message_email_body(
+    user: User,
+    extracted_fields: Iterable[tuple[str, str]],
+    encrypted_email_body: str | None = None,
+) -> str:
+    if user.email_include_message_content:
+        if user.email_encrypt_entire_body:
+            if encrypted_email_body and encrypted_email_body.startswith("-----BEGIN PGP MESSAGE-----"):
+                current_app.logger.debug("Sending email with encrypted body")
+                return encrypted_email_body
+            current_app.logger.debug(
+                "Email body is not encrypted, sending email with generic body"
+            )
+            return PLAINTEXT_NEW_MESSAGE_BODY
+
+        email_body = ""
+        for name, value in extracted_fields:
+            email_body += f"\n\n{name}\n\n{value}\n\n=============="
+        current_app.logger.debug("Sending email with unencrypted body")
+        return email_body.strip()
+
+    current_app.logger.debug("Sending email with generic body")
+    return PLAINTEXT_NEW_MESSAGE_BODY
